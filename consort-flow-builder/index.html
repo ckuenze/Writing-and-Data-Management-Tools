@@ -194,11 +194,11 @@ function measure(text, fontKey, bold, sizeMm) {
 }
 
 /* ---------- content helpers ---------- */
-function numVal(s) { var t = String(s == null ? '' : s).replace(/[,\\s]/g, ''); return /^-?\\d+(\\.\\d+)?$/.test(t) ? parseFloat(t) : null; }
+function numVal(s) { var t = String(s == null ? '' : s).replace(/[,\s]/g, ''); return /^-?\d+(\.\d+)?$/.test(t) ? parseFloat(t) : null; }
 var NB = ' ';
 function fmtCount(raw, S) {
   var t = String(raw == null ? '' : raw).trim(); if (!t) return '';
-  var v = numVal(t), body = (v !== null && S.thousands && Math.abs(v) >= 1000 && Math.floor(v) === v) ? String(Math.abs(v)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',') : t;
+  var v = numVal(t), body = (v !== null && S.thousands && Math.abs(v) >= 1000 && Math.floor(v) === v) ? String(Math.abs(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : t;
   if (v !== null && v < 0 && body.charAt(0) !== '-') body = '-' + body;
   var r;
   switch (S.nFormat) {
@@ -440,7 +440,7 @@ function toSVG(out, opts) {
   s.push('<g stroke-linecap="butt" stroke-linejoin="miter">' + lines.join('') + '</g>');
   s.push('<g>' + rects.join('') + '</g>'); s.push('<g>' + polys.join('') + '</g>');
   s.push('<g font-family="' + ff + '" xml:space="preserve">' + texts.join('') + '</g></svg>');
-  return s.join('\\n');
+  return s.join('\n');
 }
 
 /* ---------- PDF (vector, standard fonts) ---------- */
@@ -450,7 +450,7 @@ function toPDF(out, title) {
   var X = function (x) { return pf(x * k); }, Y = function (y) { return pf(Hp - y * k); };
   var rgb = function (h) { h = h.replace('#', ''); return [0, 2, 4].map(function (i) { return pf(parseInt(h.substr(i, 2), 16) / 255); }).join(' '); };
   var fkey = function (bold) { return S.fontKey === 'times' ? (bold ? 'F4' : 'F3') : (bold ? 'F2' : 'F1'); };
-  function oct(b) { return '\\\\' + ('00' + b.toString(8)).slice(-3); }
+  function oct(b) { return '\\' + ('00' + b.toString(8)).slice(-3); }
   function enc(str) {                       // split into WinAnsi / Symbol segments
     var segs = [], cur = null, i, ch, code, sym, bytes;
     for (i = 0; i < str.length; i++) {
@@ -464,24 +464,24 @@ function toPDF(out, title) {
   }
   function rr(x, y, w, h, r) {              // rounded rect path (pdf coords)
     var x0 = x * k, y0 = Hp - (y + h) * k, ww = w * k, hh = h * k, rad = Math.min(r * k, ww / 2, hh / 2), kap = 0.5523 * rad, P = pf;
-    if (rad <= 0.01) return P(x0) + ' ' + P(y0) + ' ' + P(ww) + ' ' + P(hh) + ' re\\n';
+    if (rad <= 0.01) return P(x0) + ' ' + P(y0) + ' ' + P(ww) + ' ' + P(hh) + ' re\n';
     return P(x0 + rad) + ' ' + P(y0) + ' m ' + P(x0 + ww - rad) + ' ' + P(y0) + ' l ' + P(x0 + ww - rad + kap) + ' ' + P(y0) + ' ' + P(x0 + ww) + ' ' + P(y0 + rad - kap) + ' ' + P(x0 + ww) + ' ' + P(y0 + rad) + ' c ' +
       P(x0 + ww) + ' ' + P(y0 + hh - rad) + ' l ' + P(x0 + ww) + ' ' + P(y0 + hh - rad + kap) + ' ' + P(x0 + ww - rad + kap) + ' ' + P(y0 + hh) + ' ' + P(x0 + ww - rad) + ' ' + P(y0 + hh) + ' c ' +
       P(x0 + rad) + ' ' + P(y0 + hh) + ' l ' + P(x0 + rad - kap) + ' ' + P(y0 + hh) + ' ' + P(x0) + ' ' + P(y0 + hh - rad + kap) + ' ' + P(x0) + ' ' + P(y0 + hh - rad) + ' c ' +
-      P(x0) + ' ' + P(y0 + rad) + ' l ' + P(x0) + ' ' + P(y0 + rad - kap) + ' ' + P(x0 + rad - kap) + ' ' + P(y0) + ' ' + P(x0 + rad) + ' ' + P(y0) + ' c h\\n';
+      P(x0) + ' ' + P(y0 + rad) + ' l ' + P(x0) + ' ' + P(y0 + rad - kap) + ' ' + P(x0 + rad - kap) + ' ' + P(y0) + ' ' + P(x0 + rad) + ' ' + P(y0) + ' c h\n';
   }
-  c.push('0 J 0 j\\n');
+  c.push('0 J 0 j\n');
   var order = ['line', 'rect', 'poly', 'text'], groups = { line: [], rect: [], poly: [], text: [] };
   out.dl.forEach(function (d) { groups[d.k].push(d); });
-  groups.line.forEach(function (d) { c.push(pf(d.sw * k) + ' w ' + rgb(d.stroke) + ' RG\\n'); d.pts.forEach(function (p, i) { c.push(X(p[0]) + ' ' + Y(p[1]) + (i ? ' l ' : ' m ')); }); c.push('S\\n'); });
-  groups.rect.forEach(function (d) { c.push(pf(d.sw * k) + ' w ' + rgb(d.stroke) + ' RG ' + rgb(d.fill) + ' rg\\n' + rr(d.x, d.y, d.w, d.h, d.r) + 'B\\n'); });
-  groups.poly.forEach(function (d) { c.push(rgb(d.fill) + ' rg\\n'); d.pts.forEach(function (p, i) { c.push(X(p[0]) + ' ' + Y(p[1]) + (i ? ' l ' : ' m ')); }); c.push('h f\\n'); });
+  groups.line.forEach(function (d) { c.push(pf(d.sw * k) + ' w ' + rgb(d.stroke) + ' RG\n'); d.pts.forEach(function (p, i) { c.push(X(p[0]) + ' ' + Y(p[1]) + (i ? ' l ' : ' m ')); }); c.push('S\n'); });
+  groups.rect.forEach(function (d) { c.push(pf(d.sw * k) + ' w ' + rgb(d.stroke) + ' RG ' + rgb(d.fill) + ' rg\n' + rr(d.x, d.y, d.w, d.h, d.r) + 'B\n'); });
+  groups.poly.forEach(function (d) { c.push(rgb(d.fill) + ' rg\n'); d.pts.forEach(function (p, i) { c.push(X(p[0]) + ' ' + Y(p[1]) + (i ? ' l ' : ' m ')); }); c.push('h f\n'); });
   groups.text.forEach(function (d) {
-    var x = d.x; c.push(rgb(d.color) + ' rg\\n');
+    var x = d.x; c.push(rgb(d.color) + ' rg\n');
     enc(d.s).forEach(function (sg) {
       var fnt = sg.sym ? 'F5' : fkey(d.bold), w = 0, i;
       for (i = 0; i < sg.chars.length; i++) w += cw(S.fontKey === 'aptos' ? 'arial' : S.fontKey, d.bold, sg.chars.charAt(i));
-      c.push('BT /' + fnt + ' ' + pf(d.size * k) + ' Tf ' + X(x) + ' ' + Y(d.y) + ' Td (' + sg.s + ') Tj ET\\n'); x += w * d.size / 1000;
+      c.push('BT /' + fnt + ' ' + pf(d.size * k) + ' Tf ' + X(x) + ' ' + Y(d.y) + ' Td (' + sg.s + ') Tj ET\n'); x += w * d.size / 1000;
     });
   });
   var content = c.join(''), H = 'Helvetica', objs = [];
@@ -489,18 +489,18 @@ function toPDF(out, title) {
   objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
   objs[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
   objs[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pf(Wp) + ' ' + pf(Hp) + '] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R /F5 9 0 R >> >> /Contents 4 0 R >>';
-  objs[4] = '<< /Length ' + content.length + ' >>\\nstream\\n' + content + 'endstream';
+  objs[4] = '<< /Length ' + content.length + ' >>\nstream\n' + content + 'endstream';
   objs[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
   objs[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
   objs[7] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>';
   objs[8] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>';
   objs[9] = '<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>';
-  objs[10] = '<< /Title (' + String(title || 'Flow diagram').replace(/[()\\\\]/g, '').replace(/[^\\x20-\\x7E]/g, '') + ') /Producer (CONSORT flow diagram builder) >>';
-  var pdf = '%PDF-1.4\\n%\\xE2\\xE3\\xCF\\xD3\\n', offs = [], i2;
-  for (i2 = 1; i2 <= 10; i2++) { offs[i2] = pdf.length; pdf += i2 + ' 0 obj\\n' + objs[i2] + '\\nendobj\\n'; }
-  var xref = pdf.length; pdf += 'xref\\n0 11\\n0000000000 65535 f \\n';
-  for (i2 = 1; i2 <= 10; i2++) pdf += ('0000000000' + offs[i2]).slice(-10) + ' 00000 n \\n';
-  pdf += 'trailer\\n<< /Size 11 /Root 1 0 R /Info 10 0 R >>\\nstartxref\\n' + xref + '\\n%%EOF\\n';
+  objs[10] = '<< /Title (' + String(title || 'Flow diagram').replace(/[()\\]/g, '').replace(/[^\x20-\x7E]/g, '') + ') /Producer (CONSORT flow diagram builder) >>';
+  var pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', offs = [], i2;
+  for (i2 = 1; i2 <= 10; i2++) { offs[i2] = pdf.length; pdf += i2 + ' 0 obj\n' + objs[i2] + '\nendobj\n'; }
+  var xref = pdf.length; pdf += 'xref\n0 11\n0000000000 65535 f \n';
+  for (i2 = 1; i2 <= 10; i2++) pdf += ('0000000000' + offs[i2]).slice(-10) + ' 00000 n \n';
+  pdf += 'trailer\n<< /Size 11 /Root 1 0 R /Info 10 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
   var bytes = new Uint8Array(pdf.length); for (i2 = 0; i2 < pdf.length; i2++) bytes[i2] = pdf.charCodeAt(i2) & 255;
   return { bytes: bytes, replaced: Object.keys(bad) };
 }
@@ -732,8 +732,8 @@ async function saveFile(name, data, mime) {
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   status('Downloaded ' + name);
 }
-function baseName() { return (String(state.settings.projectName || 'consort-flow').trim().replace(/[^\\w\\-. ]+/g, '').replace(/\\s+/g, '-') || 'consort-flow'); }
-async function exSvg() { flushBurst(); var out = CF.layout(state); if (out.empty) return status('Nothing to export yet.', true); await saveFile(baseName() + '.svg', '<?xml version="1.0" encoding="UTF-8"?>\\n' + CF.toSVG(out, { title: state.settings.projectName, export: true }), 'image/svg+xml'); }
+function baseName() { return (String(state.settings.projectName || 'consort-flow').trim().replace(/[^\w\-. ]+/g, '').replace(/\s+/g, '-') || 'consort-flow'); }
+async function exSvg() { flushBurst(); var out = CF.layout(state); if (out.empty) return status('Nothing to export yet.', true); await saveFile(baseName() + '.svg', '<?xml version="1.0" encoding="UTF-8"?>\n' + CF.toSVG(out, { title: state.settings.projectName, export: true }), 'image/svg+xml'); }
 async function exPdf() {
   var out = CF.layout(state); if (out.empty) return status('Nothing to export yet.', true);
   if (!CF.FONTS[out.S.fontKey].std) return status('PDF export needs Arial or Times New Roman. Pick one of those fonts, or export SVG or PNG.', true);
