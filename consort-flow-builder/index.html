@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CONSORT flow diagram builder</title>
+<style>
+:root{
+  --bg:#f4f5f8; --card:#ffffff; --ink:#1a2030; --muted:#566074; --line:#d4d9e3; --field:#ffffff; --primary:#232D4B; --primary-ink:#ffffff;
+  --accent:#C45F00; --focus:#E57200; --warn-bg:#fff3e0; --warn-ink:#6b3300; --info-bg:#eaf0fb; --info-ink:#1f3560; --ok-bg:#e6f4ea; --ok-ink:#14532d;
+  --shadow:0 1px 2px rgba(20,30,50,.08); color-scheme:light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10131a; --card:#1a1f2b; --ink:#e8ebf2; --muted:#a6b0c3; --line:#323a4e; --field:#131824; --primary:#9db0ea; --primary-ink:#0d1222;
+    --accent:#ffa24d; --focus:#ffa24d; --warn-bg:#3b2a12; --warn-ink:#ffd9ad; --info-bg:#1b2742; --info-ink:#c8d6f7; --ok-bg:#16301f; --ok-ink:#a7e3bb; --shadow:none; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10131a; --card:#1a1f2b; --ink:#e8ebf2; --muted:#a6b0c3; --line:#323a4e; --field:#131824; --primary:#9db0ea; --primary-ink:#0d1222;
+  --accent:#ffa24d; --focus:#ffa24d; --warn-bg:#3b2a12; --warn-ink:#ffd9ad; --info-bg:#1b2742; --info-ink:#c8d6f7; --ok-bg:#16301f; --ok-ink:#a7e3bb; --shadow:none; color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--card);z-index:10}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0}
+.sub{margin:2px 0 0;color:var(--muted);font-size:13px}
+h2{font-size:15px;margin:0 0 8px}
+.app{display:grid;grid-template-columns:minmax(340px,500px) minmax(0,1fr);gap:16px;max-width:1560px;margin:0 auto;padding:14px 16px 40px;align-items:start}
+@media (max-width:980px){.app{grid-template-columns:minmax(0,1fr)}}
+.stage{position:sticky;top:calc(env(safe-area-inset-top,0px) + 74px);max-height:calc(100vh - 90px);overflow:auto;padding-right:2px}
+@media (max-width:980px){.stage{position:static;max-height:none;overflow:visible}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:12px}
+.hint,.meta{color:var(--muted);font-size:12.5px;margin:4px 0 8px}
+.btn{font:inherit;padding:7px 12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--primary)}
+.btn.primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary);font-weight:600}
+.btn.small{padding:4px 9px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+.icon{font:inherit;width:28px;height:28px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;cursor:pointer;padding:0;line-height:1}
+.icon:hover{border-color:var(--primary)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.tpl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tpl{text-align:left;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+.tpl:hover{border-color:var(--primary)} .tpl b{display:block;font-size:13px} .tpl span{color:var(--muted);font-size:12px}
+.fld{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);min-width:0}
+.fld input,.fld select,.line input[type=text],.line input:not([type]),textarea{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:100%;min-width:0}
+textarea{min-height:90px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.row-card{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:color-mix(in srgb,var(--card) 92%,var(--ink) 4%)}
+.row-head{display:grid;grid-template-columns:auto minmax(110px,1fr) 78px auto;gap:8px;align-items:end;margin-bottom:8px}
+.row-head .rn{font-weight:700;align-self:center}
+.btns{display:flex;gap:4px}
+fieldset.box{border:1px solid var(--line);border-radius:8px;margin:0 0 8px;padding:8px 10px;background:var(--card)}
+fieldset.box legend{font-size:12.5px;font-weight:600;padding:0 4px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:8px;margin-bottom:6px}
+.line{display:grid;grid-template-columns:minmax(0,1fr) 64px auto auto auto auto;gap:5px;align-items:center;margin-bottom:5px}
+.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.chk input{width:auto;margin:0}
+.boxfoot{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.note{font-size:12px;color:var(--muted);margin:2px 0 6px}
+.add-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.setgrp{border:1px solid var(--line);border-radius:8px;margin:0 0 10px;padding:8px 10px}
+.setgrp legend{font-weight:600;font-size:12.5px;padding:0 4px}
+.setgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}
+.wrow{display:flex;gap:6px}
+.jump{display:none}
+@media (max-width:980px){.jump{display:inline-block;text-decoration:none}}
+@media (max-width:560px){.row-head{grid-template-columns:minmax(0,1fr) 78px}.row-head .rn,.row-head .btns{grid-column:1/-1}.setgrid{grid-template-columns:minmax(0,1fr)}.tpl-grid{grid-template-columns:minmax(0,1fr)}.line{grid-template-columns:minmax(0,1fr) 56px auto auto auto auto}.btns{flex-wrap:wrap}}
+.stage-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.paper{background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;max-height:70vh}
+.paper svg{display:block}
+#checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+#checks li{padding:6px 10px;border-radius:8px;font-size:13px}
+#checks .warn{background:var(--warn-bg);color:var(--warn-ink)} #checks .info{background:var(--info-bg);color:var(--info-ink)} #checks .ok{background:var(--ok-bg);color:var(--ok-ink)}
+.export-grid{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+#status{min-height:1.4em;margin:8px 0 0;font-size:13px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+details.tips summary{cursor:pointer;font-weight:600}
+details.tips ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><h1>CONSORT flow diagram builder</h1><p class="sub">Build participant flow diagrams at print size and export them as SVG, PDF or high-resolution PNG.</p></div>
+  <div class="btns"><a class="btn jump" href="#previewCard">Preview ↓</a><button class="btn" data-act="undo" id="undoBtn" type="button">Undo</button><button class="btn" data-act="redo" id="redoBtn" type="button">Redo</button></div>
+</header>
+<main class="app">
+  <section class="editor" aria-label="Editor">
+    <div class="card"><h2>1. Start from a template</h2>
+      <p class="hint">Example numbers are placeholders that add up. Replace them, or clear them all and enter your own.</p>
+      <div class="tpl-grid" id="tplGrid"></div>
+      <div class="add-row"><button class="btn small" data-act="clearNums" type="button">Clear all numbers</button></div></div>
+    <div class="card"><h2>2. Boxes and counts</h2>
+      <p class="hint">Each row is a level of the diagram. A row with one box can have an exclusion box on its right. Rows with several boxes show parallel groups or arms.</p>
+      <div id="rows"></div>
+      <div class="add-row"><span class="note" style="align-self:center">Add a row:</span>
+        <button class="btn small" data-act="addRow" data-type="single" type="button">1 box</button>
+        <button class="btn small" data-act="addRow" data-type="single-excl" type="button">1 box + exclusions</button>
+        <button class="btn small" data-act="addRow" data-type="two" type="button">2 boxes</button>
+        <button class="btn small" data-act="addRow" data-type="three" type="button">3 boxes</button>
+        <button class="btn small" data-act="addRow" data-type="four" type="button">4 boxes</button></div></div>
+    <div class="card"><h2>3. Appearance and size</h2><div id="settings"></div></div>
+    <div class="card"><h2>4. Project file</h2>
+      <p class="hint">Your work is also saved automatically in this browser. A project file lets the lab share or reopen a diagram.</p>
+      <div class="add-row"><button class="btn small" data-act="saveJson" type="button">Save project (.json)</button>
+        <button class="btn small" data-act="openJson" type="button">Open project…</button><input type="file" id="fileIn" accept=".json,application/json" hidden></div>
+      <details style="margin-top:8px"><summary class="note">Copy or paste project text instead</summary>
+        <textarea id="jsonbox" aria-label="Project JSON" spellcheck="false"></textarea>
+        <div class="add-row"><button class="btn small" data-act="jsonFill" type="button">Show current project</button><button class="btn small" data-act="jsonLoad" type="button">Load from text</button></div></details></div>
+  </section>
+  <section class="stage" aria-label="Preview and export">
+    <div class="card" id="previewCard"><div class="stage-head"><h2 style="margin:0">Live preview</h2>
+        <label class="fld" style="flex-direction:row;align-items:center;gap:6px">Zoom <select id="zoom" style="width:auto"><option value="fit">Fit to window</option><option value="100">100% (print size)</option><option value="150">150%</option><option value="200">200%</option></select></label></div>
+      <p class="meta" id="sizeInfo"></p>
+      <div class="paper" id="paper"></div></div>
+    <div class="card"><h2>Checks</h2><ul id="checks"></ul></div>
+    <div class="card"><h2>Export</h2>
+      <div class="export-grid">
+        <label class="fld">File name<input id="projName" data-p="settings.projectName" style="min-width:160px"></label>
+        <label class="fld">PNG resolution<select id="dpi" data-p="settings.dpi"><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200">1200 dpi</option></select></label>
+      </div>
+      <div class="add-row" style="margin-top:10px">
+        <button class="btn primary" data-act="exSvg" type="button">Download SVG</button>
+        <button class="btn primary" data-act="exPdf" id="pdfBtn" type="button">Download PDF</button>
+        <button class="btn primary" data-act="exPng" type="button">Download PNG</button></div>
+      <p class="hint" style="margin-bottom:0">You may be asked to confirm each download.</p><p id="status" role="status" aria-live="polite"></p></div>
+    <details class="card tips"><summary>Tips for journal submission</summary>
+      <ul>
+        <li>The figure is built in millimetres, so the exported file is already at print size. Typical widths are about 85–90 mm (one column), 114–140 mm (1.5 columns) and 170–190 mm (two columns). Check your journal’s figure guidelines.</li>
+        <li>Journals usually ask for text of about 6–8 pt or larger at final size, in Arial or Helvetica. Line art is often requested at 600–1200 dpi.</li>
+        <li>SVG and PDF are vector files that stay sharp at any size and can be edited in Illustrator or Inkscape. PNG files record their resolution (dpi).</li>
+        <li>PDF export uses the standard Helvetica or Times fonts. The characters ≥, ≤, ≠, ≈ and − are supported. Other symbols outside standard Western text print as ?; use SVG or PNG for those.</li>
+        <li>The checks panel compares counts across rows and flags totals that do not add up. It cannot know your study design, so treat it as a second pair of eyes.</li>
+      </ul></details>
+  </section>
+</main>
+<script>window.__WIDTHS__ = {"h":{"32":278.0,"33":278.0,"34":355.0,"35":556.0,"36":556.0,"37":889.0,"38":667.0,"39":191.0,"40":333.0,"41":333.0,"42":389.0,"43":584.0,"44":278.0,"45":333.0,"46":278.0,"47":278.0,"48":556.0,"49":556.0,"50":556.0,"51":556.0,"52":556.0,"53":556.0,"54":556.0,"55":556.0,"56":556.0,"57":556.0,"58":278.0,"59":278.0,"60":584.0,"61":584.0,"62":584.0,"63":556.0,"64":1015.0,"65":667.0,"66":667.0,"67":722.0,"68":722.0,"69":667.0,"70":611.0,"71":778.0,"72":722.0,"73":278.0,"74":500.0,"75":667.0,"76":556.0,"77":833.0,"78":722.0,"79":778.0,"80":667.0,"81":778.0,"82":722.0,"83":667.0,"84":611.0,"85":722.0,"86":667.0,"87":944.0,"88":667.0,"89":667.0,"90":611.0,"91":278.0,"92":278.0,"93":278.0,"94":469.0,"95":556.0,"96":333.0,"97":556.0,"98":556.0,"99":500.0,"100":556.0,"101":556.0,"102":278.0,"103":556.0,"104":556.0,"105":222.0,"106":222.0,"107":500.0,"108":222.0,"109":833.0,"110":556.0,"111":556.0,"112":556.0,"113":556.0,"114":333.0,"115":500.0,"116":278.0,"117":556.0,"118":500.0,"119":722.0,"120":500.0,"121":500.0,"122":500.0,"123":334.0,"124":260.0,"125":334.0,"126":584.0,"160":278.0,"161":333.0,"162":556.0,"163":556.0,"164":556.0,"165":556.0,"166":260.0,"167":556.0,"168":333.0,"169":737.0,"170":370.0,"171":556.0,"172":584.0,"173":333.0,"174":737.0,"175":333.0,"176":400.0,"177":584.0,"178":333.0,"179":333.0,"180":333.0,"181":556.0,"182":537.0,"183":278.0,"184":333.0,"185":333.0,"186":365.0,"187":556.0,"188":834.0,"189":834.0,"190":834.0,"191":611.0,"192":667.0,"193":667.0,"194":667.0,"195":667.0,"196":667.0,"197":667.0,"198":1000.0,"199":722.0,"200":667.0,"201":667.0,"202":667.0,"203":667.0,"204":278.0,"205":278.0,"206":278.0,"207":278.0,"208":722.0,"209":722.0,"210":778.0,"211":778.0,"212":778.0,"213":778.0,"214":778.0,"215":584.0,"216":778.0,"217":722.0,"218":722.0,"219":722.0,"220":722.0,"221":667.0,"222":667.0,"223":611.0,"224":556.0,"225":556.0,"226":556.0,"227":556.0,"228":556.0,"229":556.0,"230":889.0,"231":500.0,"232":556.0,"233":556.0,"234":556.0,"235":556.0,"236":278.0,"237":278.0,"238":278.0,"239":278.0,"240":556.0,"241":556.0,"242":556.0,"243":556.0,"244":556.0,"245":556.0,"246":556.0,"247":584.0,"248":611.0,"249":556.0,"250":556.0,"251":556.0,"252":556.0,"253":500.0,"254":556.0,"255":500.0,"8364":556.0,"8218":222.0,"402":556.0,"8222":333.0,"8230":1000.0,"8224":556.0,"8225":556.0,"710":333.0,"8240":1000.0,"352":667.0,"8249":333.0,"338":1000.0,"381":611.0,"8216":222.0,"8217":222.0,"8220":333.0,"8221":333.0,"8226":350.0,"8211":556.0,"8212":1000.0,"732":333.0,"8482":1000.0,"353":500.0,"8250":333.0,"339":944.0,"382":500.0,"376":667.0},"hb":{"32":278.0,"33":333.0,"34":474.0,"35":556.0,"36":556.0,"37":889.0,"38":722.0,"39":238.0,"40":333.0,"41":333.0,"42":389.0,"43":584.0,"44":278.0,"45":333.0,"46":278.0,"47":278.0,"48":556.0,"49":556.0,"50":556.0,"51":556.0,"52":556.0,"53":556.0,"54":556.0,"55":556.0,"56":556.0,"57":556.0,"58":333.0,"59":333.0,"60":584.0,"61":584.0,"62":584.0,"63":611.0,"64":975.0,"65":722.0,"66":722.0,"67":722.0,"68":722.0,"69":667.0,"70":611.0,"71":778.0,"72":722.0,"73":278.0,"74":556.0,"75":722.0,"76":611.0,"77":833.0,"78":722.0,"79":778.0,"80":667.0,"81":778.0,"82":722.0,"83":667.0,"84":611.0,"85":722.0,"86":667.0,"87":944.0,"88":667.0,"89":667.0,"90":611.0,"91":333.0,"92":278.0,"93":333.0,"94":584.0,"95":556.0,"96":333.0,"97":556.0,"98":611.0,"99":556.0,"100":611.0,"101":556.0,"102":333.0,"103":611.0,"104":611.0,"105":278.0,"106":278.0,"107":556.0,"108":278.0,"109":889.0,"110":611.0,"111":611.0,"112":611.0,"113":611.0,"114":389.0,"115":556.0,"116":333.0,"117":611.0,"118":556.0,"119":778.0,"120":556.0,"121":556.0,"122":500.0,"123":389.0,"124":280.0,"125":389.0,"126":584.0,"160":278.0,"161":333.0,"162":556.0,"163":556.0,"164":556.0,"165":556.0,"166":280.0,"167":556.0,"168":333.0,"169":737.0,"170":370.0,"171":556.0,"172":584.0,"173":333.0,"174":737.0,"175":333.0,"176":400.0,"177":584.0,"178":333.0,"179":333.0,"180":333.0,"181":611.0,"182":556.0,"183":278.0,"184":333.0,"185":333.0,"186":365.0,"187":556.0,"188":834.0,"189":834.0,"190":834.0,"191":611.0,"192":722.0,"193":722.0,"194":722.0,"195":722.0,"196":722.0,"197":722.0,"198":1000.0,"199":722.0,"200":667.0,"201":667.0,"202":667.0,"203":667.0,"204":278.0,"205":278.0,"206":278.0,"207":278.0,"208":722.0,"209":722.0,"210":778.0,"211":778.0,"212":778.0,"213":778.0,"214":778.0,"215":584.0,"216":778.0,"217":722.0,"218":722.0,"219":722.0,"220":722.0,"221":667.0,"222":667.0,"223":611.0,"224":556.0,"225":556.0,"226":556.0,"227":556.0,"228":556.0,"229":556.0,"230":889.0,"231":556.0,"232":556.0,"233":556.0,"234":556.0,"235":556.0,"236":278.0,"237":278.0,"238":278.0,"239":278.0,"240":611.0,"241":611.0,"242":611.0,"243":611.0,"244":611.0,"245":611.0,"246":611.0,"247":584.0,"248":611.0,"249":611.0,"250":611.0,"251":611.0,"252":611.0,"253":556.0,"254":611.0,"255":556.0,"8364":556.0,"8218":278.0,"402":556.0,"8222":500.0,"8230":1000.0,"8224":556.0,"8225":556.0,"710":333.0,"8240":1000.0,"352":667.0,"8249":333.0,"338":1000.0,"381":611.0,"8216":278.0,"8217":278.0,"8220":500.0,"8221":500.0,"8226":350.0,"8211":556.0,"8212":1000.0,"732":333.0,"8482":1000.0,"353":556.0,"8250":333.0,"339":944.0,"382":500.0,"376":667.0},"t":{"32":250.0,"33":333.0,"34":408.0,"35":500.0,"36":500.0,"37":833.0,"38":778.0,"39":180.0,"40":333.0,"41":333.0,"42":500.0,"43":564.0,"44":250.0,"45":333.0,"46":250.0,"47":278.0,"48":500.0,"49":500.0,"50":500.0,"51":500.0,"52":500.0,"53":500.0,"54":500.0,"55":500.0,"56":500.0,"57":500.0,"58":278.0,"59":278.0,"60":564.0,"61":564.0,"62":564.0,"63":444.0,"64":921.0,"65":722.0,"66":667.0,"67":667.0,"68":722.0,"69":611.0,"70":556.0,"71":722.0,"72":722.0,"73":333.0,"74":389.0,"75":722.0,"76":611.0,"77":889.0,"78":722.0,"79":722.0,"80":556.0,"81":722.0,"82":667.0,"83":556.0,"84":611.0,"85":722.0,"86":722.0,"87":944.0,"88":722.0,"89":722.0,"90":611.0,"91":333.0,"92":278.0,"93":333.0,"94":469.0,"95":500.0,"96":333.0,"97":444.0,"98":500.0,"99":444.0,"100":500.0,"101":444.0,"102":333.0,"103":500.0,"104":500.0,"105":278.0,"106":278.0,"107":500.0,"108":278.0,"109":778.0,"110":500.0,"111":500.0,"112":500.0,"113":500.0,"114":333.0,"115":389.0,"116":278.0,"117":500.0,"118":500.0,"119":722.0,"120":500.0,"121":500.0,"122":444.0,"123":480.0,"124":200.0,"125":480.0,"126":541.0,"160":250.0,"161":333.0,"162":500.0,"163":500.0,"164":500.0,"165":500.0,"166":200.0,"167":500.0,"168":333.0,"169":760.0,"170":276.0,"171":500.0,"172":564.0,"173":333.0,"174":760.0,"175":333.0,"176":400.0,"177":564.0,"178":300.0,"179":300.0,"180":333.0,"181":500.0,"182":453.0,"183":250.0,"184":333.0,"185":300.0,"186":310.0,"187":500.0,"188":750.0,"189":750.0,"190":750.0,"191":444.0,"192":722.0,"193":722.0,"194":722.0,"195":722.0,"196":722.0,"197":722.0,"198":889.0,"199":667.0,"200":611.0,"201":611.0,"202":611.0,"203":611.0,"204":333.0,"205":333.0,"206":333.0,"207":333.0,"208":722.0,"209":722.0,"210":722.0,"211":722.0,"212":722.0,"213":722.0,"214":722.0,"215":564.0,"216":722.0,"217":722.0,"218":722.0,"219":722.0,"220":722.0,"221":722.0,"222":556.0,"223":500.0,"224":444.0,"225":444.0,"226":444.0,"227":444.0,"228":444.0,"229":444.0,"230":667.0,"231":444.0,"232":444.0,"233":444.0,"234":444.0,"235":444.0,"236":278.0,"237":278.0,"238":278.0,"239":278.0,"240":500.0,"241":500.0,"242":500.0,"243":500.0,"244":500.0,"245":500.0,"246":500.0,"247":564.0,"248":500.0,"249":500.0,"250":500.0,"251":500.0,"252":500.0,"253":500.0,"254":500.0,"255":500.0,"8364":500.0,"8218":333.0,"402":500.0,"8222":444.0,"8230":1000.0,"8224":500.0,"8225":500.0,"710":333.0,"8240":1000.0,"352":556.0,"8249":333.0,"338":889.0,"381":611.0,"8216":333.0,"8217":333.0,"8220":444.0,"8221":444.0,"8226":350.0,"8211":500.0,"8212":1000.0,"732":333.0,"8482":980.0,"353":389.0,"8250":333.0,"339":722.0,"382":444.0,"376":722.0},"tb":{"32":250.0,"33":333.0,"34":555.0,"35":500.0,"36":500.0,"37":1000.0,"38":833.0,"39":278.0,"40":333.0,"41":333.0,"42":500.0,"43":570.0,"44":250.0,"45":333.0,"46":250.0,"47":278.0,"48":500.0,"49":500.0,"50":500.0,"51":500.0,"52":500.0,"53":500.0,"54":500.0,"55":500.0,"56":500.0,"57":500.0,"58":333.0,"59":333.0,"60":570.0,"61":570.0,"62":570.0,"63":500.0,"64":930.0,"65":722.0,"66":667.0,"67":722.0,"68":722.0,"69":667.0,"70":611.0,"71":778.0,"72":778.0,"73":389.0,"74":500.0,"75":778.0,"76":667.0,"77":944.0,"78":722.0,"79":778.0,"80":611.0,"81":778.0,"82":722.0,"83":556.0,"84":667.0,"85":722.0,"86":722.0,"87":1000.0,"88":722.0,"89":722.0,"90":667.0,"91":333.0,"92":278.0,"93":333.0,"94":581.0,"95":500.0,"96":333.0,"97":500.0,"98":556.0,"99":444.0,"100":556.0,"101":444.0,"102":333.0,"103":500.0,"104":556.0,"105":278.0,"106":333.0,"107":556.0,"108":278.0,"109":833.0,"110":556.0,"111":500.0,"112":556.0,"113":556.0,"114":444.0,"115":389.0,"116":333.0,"117":556.0,"118":500.0,"119":722.0,"120":500.0,"121":500.0,"122":444.0,"123":394.0,"124":220.0,"125":394.0,"126":520.0,"160":250.0,"161":333.0,"162":500.0,"163":500.0,"164":500.0,"165":500.0,"166":220.0,"167":500.0,"168":333.0,"169":747.0,"170":300.0,"171":500.0,"172":570.0,"173":333.0,"174":747.0,"175":333.0,"176":400.0,"177":570.0,"178":300.0,"179":300.0,"180":333.0,"181":556.0,"182":540.0,"183":250.0,"184":333.0,"185":300.0,"186":330.0,"187":500.0,"188":750.0,"189":750.0,"190":750.0,"191":500.0,"192":722.0,"193":722.0,"194":722.0,"195":722.0,"196":722.0,"197":722.0,"198":1000.0,"199":722.0,"200":667.0,"201":667.0,"202":667.0,"203":667.0,"204":389.0,"205":389.0,"206":389.0,"207":389.0,"208":722.0,"209":722.0,"210":778.0,"211":778.0,"212":778.0,"213":778.0,"214":778.0,"215":570.0,"216":778.0,"217":722.0,"218":722.0,"219":722.0,"220":722.0,"221":722.0,"222":611.0,"223":556.0,"224":500.0,"225":500.0,"226":500.0,"227":500.0,"228":500.0,"229":500.0,"230":722.0,"231":444.0,"232":444.0,"233":444.0,"234":444.0,"235":444.0,"236":278.0,"237":278.0,"238":278.0,"239":278.0,"240":500.0,"241":556.0,"242":500.0,"243":500.0,"244":500.0,"245":500.0,"246":500.0,"247":570.0,"248":500.0,"249":556.0,"250":556.0,"251":556.0,"252":556.0,"253":500.0,"254":556.0,"255":500.0,"8364":500.0,"8218":333.0,"402":500.0,"8222":500.0,"8230":1000.0,"8224":500.0,"8225":500.0,"710":333.0,"8240":1000.0,"352":556.0,"8249":333.0,"338":1000.0,"381":667.0,"8216":333.0,"8217":333.0,"8220":500.0,"8221":500.0,"8226":350.0,"8211":500.0,"8212":1000.0,"732":333.0,"8482":1000.0,"353":389.0,"8250":333.0,"339":722.0,"382":444.0,"376":722.0}};</script>
+<script>/* CONSORT flow diagram engine: layout -> display list -> SVG / PDF.  No DOM needed (except optional canvas metrics for Aptos). */
+(function (root) {
+'use strict';
+var PT = 25.4 / 72;                                   // 1 pt in mm
+var WIDTHS = null;                                    // {h,hb,t,tb}: char code -> width (1/1000 em), injected below
+function setWidths(w) { WIDTHS = w; }
+
+var FONTS = {
+  arial: { label: 'Arial / Helvetica', stack: 'Arial, Helvetica, "Liberation Sans", sans-serif', std: true, serif: false },
+  times: { label: 'Times New Roman', stack: '"Times New Roman", Times, "Liberation Serif", serif', std: true, serif: true },
+  aptos: { label: 'Aptos (needs Aptos installed)', stack: 'Aptos, Calibri, Arial, Helvetica, sans-serif', std: false, serif: false }
+};
+var SYM = { '≥': [0xB3, 549], '≤': [0xA3, 549], '≠': [0xB9, 549], '≈': [0xBB, 549], '−': [0x2D, 549] };
+var WIN = { '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87, 'ˆ': 0x88, '‰': 0x89,
+  'Š': 0x8A, '‹': 0x8B, 'Œ': 0x8C, 'Ž': 0x8E, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95,
+  '–': 0x96, '—': 0x97, '˜': 0x98, '™': 0x99, 'š': 0x9A, '›': 0x9B, 'œ': 0x9C, 'ž': 0x9E, 'Ÿ': 0x9F };
+
+var DEFAULTS = { widthMm: 170, fontKey: 'arial', fontPt: 8, linePt: 0.75, theme: 'bw', radius: 0.8, nFormat: 'paren_eq', thousands: true,
+  align: 'center', headingBold: false, gapY: 8, gapX: 6, pad: 1.8, spinePct: 40, equalHeights: true, showPhases: true, phaseStyle: 'fill',
+  arrows: true, transparent: false, lineSpacing: 1.22, dpi: 600, projectName: 'consort-flow' };
+var THEMES = {
+  bw:   { stroke: '#000000', text: '#000000', boxFill: '#FFFFFF', sideFill: '#FFFFFF', phaseFill: '#E6E6E6' },
+  grey: { stroke: '#000000', text: '#000000', boxFill: '#F3F3F3', sideFill: '#FFFFFF', phaseFill: '#D4D4D4' },
+  uva:  { stroke: '#232D4B', text: '#000000', boxFill: '#FFFFFF', sideFill: '#FBE7D3', phaseFill: '#DDE2EE' }
+};
+function clamp(v, a, b) { v = +v; if (!isFinite(v)) return a; return Math.min(b, Math.max(a, v)); }
+function normSettings(s) {
+  var o = {}, k; s = s || {};
+  for (k in DEFAULTS) o[k] = (s[k] === undefined || s[k] === null) ? DEFAULTS[k] : s[k];
+  o.widthMm = clamp(o.widthMm, 40, 400); o.fontPt = clamp(o.fontPt, 4, 16); o.linePt = clamp(o.linePt, 0.25, 3);
+  o.radius = clamp(o.radius, 0, 5); o.gapY = clamp(o.gapY, 3, 30); o.gapX = clamp(o.gapX, 2, 20); o.pad = clamp(o.pad, 0.8, 5);
+  o.spinePct = clamp(o.spinePct, 25, 80); o.lineSpacing = clamp(o.lineSpacing, 1.05, 1.6); o.dpi = clamp(o.dpi, 72, 1200);
+  if (!FONTS[o.fontKey]) o.fontKey = 'arial'; if (!THEMES[o.theme]) o.theme = 'bw';
+  return o;
+}
+
+/* ---------- text metrics (mm) ---------- */
+var _cv = null;
+function cw(fontKey, bold, ch) {
+  if (SYM[ch]) return SYM[ch][1];
+  var code = ch.charCodeAt(0), t = FONTS[fontKey].serif ? (bold ? WIDTHS.tb : WIDTHS.t) : (bold ? WIDTHS.hb : WIDTHS.h);
+  var w = t[code]; if (w === undefined && WIN[ch] !== undefined) w = t[WIN[ch]];
+  return w === undefined ? (FONTS[fontKey].serif ? 500 : 556) : w;
+}
+function measure(text, fontKey, bold, sizeMm) {
+  var i, w = 0;
+  if (!FONTS[fontKey].std && typeof document !== 'undefined') {
+    if (!_cv) _cv = document.createElement('canvas').getContext('2d');
+    _cv.font = (bold ? '700 ' : '400 ') + '100px ' + FONTS[fontKey].stack;
+    return _cv.measureText(text).width / 100 * sizeMm;
+  }
+  for (i = 0; i < text.length; i++) w += cw(fontKey === 'aptos' ? 'arial' : fontKey, bold, text.charAt(i));
+  return w * sizeMm / 1000;
+}
+
+/* ---------- content helpers ---------- */
+function numVal(s) { var t = String(s == null ? '' : s).replace(/[,\\s]/g, ''); return /^-?\\d+(\\.\\d+)?$/.test(t) ? parseFloat(t) : null; }
+var NB = ' ';
+function fmtCount(raw, S) {
+  var t = String(raw == null ? '' : raw).trim(); if (!t) return '';
+  var v = numVal(t), body = (v !== null && S.thousands && Math.abs(v) >= 1000 && Math.floor(v) === v) ? String(Math.abs(v)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',') : t;
+  if (v !== null && v < 0 && body.charAt(0) !== '-') body = '-' + body;
+  var r;
+  switch (S.nFormat) {
+    case 'paren': r = '(n=' + body + ')'; break;
+    case 'eq': r = 'n = ' + body; break;
+    case 'plain': r = body; break;
+    case 'paren_num': r = '(' + body + ')'; break;
+    default: r = '(n = ' + body + ')';
+  }
+  return r.replace(/ /g, NB);
+}
+function labelText(label, n, S) { var l = String(label == null ? '' : label).trim(), c = fmtCount(n, S); return l && c ? l + ' ' + c : (l || c); }
+function wrap(text, maxW, m) {
+  var words = String(text).split(' ').filter(function (x) { return x.length; }), lines = [], cur = '', i, w, t, j, piece;
+  for (i = 0; i < words.length; i++) {
+    w = words[i]; t = cur ? cur + ' ' + w : w;
+    if (m(t) <= maxW || !cur) {
+      if (!cur && m(w) > maxW) {                             // very long word: break by characters
+        piece = '';
+        for (j = 0; j < w.length; j++) { if (m(piece + w.charAt(j)) > maxW && piece) { lines.push(piece); piece = ''; } piece += w.charAt(j); }
+        cur = piece;
+      } else cur = t;
+    } else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [''];
+}
+
+/* ---------- layout ---------- */
+function normRow(r) {
+  var cells = (r && r.cells && r.cells.length ? r.cells : [{}]).slice(0, 4);
+  return { phase: String((r && r.phase) || '').trim(), cells: cells.map(function (c) {
+    c = c || {}; var mk = function (b) { b = b || {}; return { enabled: !!b.enabled, heading: b.heading || '', n: b.n == null ? '' : String(b.n), checkSum: !!b.checkSum,
+      lines: (b.lines || []).map(function (l) { return { text: (l && l.text) || '', n: l && l.n != null ? String(l.n) : '', bullet: !!(l && l.bullet) }; }) }; };
+    return { main: mk(c.main), side: mk(c.side) };
+  }) };
+}
+function layout(state) {
+  var S = normSettings(state && state.settings), T = THEMES[S.theme];
+  var fs = S.fontPt * PT, lh = fs * S.lineSpacing, pad = S.pad, sw = S.linePt * PT, margin = Math.max(1.5, sw * 2), CLR = 1.6;
+  var W = S.widthMm, warnings = [], dl = [], rows = ((state && state.rows) || []).map(normRow);
+  var m = function (t, b) { return measure(t, S.fontKey, !!b, fs); };
+  if (!rows.length) return { dl: [], W: W, H: 30, empty: true, warnings: [], S: S, T: T, minBoxW: 0, boxes: [] };
+  var baseOff = (lh - 1.117 * fs) / 2 + 0.905 * fs;      // first baseline below line top
+  var hasPhases = S.showPhases && rows.some(function (r) { return r.phase; });
+  var labelW = 0, phaseWrap = {};
+  if (hasPhases) {
+    rows.forEach(function (r) { if (r.phase && !phaseWrap[r.phase]) {
+      var ls = wrap(r.phase.replace(/ /g, ' '), 30 - 2 * pad, function (t) { return m(t, true); });
+      phaseWrap[r.phase] = ls; ls.forEach(function (l) { labelW = Math.max(labelW, m(l, true) + 2 * pad); }); } });
+    labelW = Math.max(labelW, 12);
+  }
+  var x0 = margin + (hasPhases ? labelW + S.gapX : 0), contentW = W - margin - x0;
+  var multi = rows.some(function (r) { return r.cells.length > 1; });
+  var anySide = rows.some(function (r) { return r.cells.length === 1 && r.cells[0].side.enabled; });
+  var minBoxW = 1e9;
+
+  function boxContent(b, w) {
+    var inner = w - 2 * pad, items = [], y = 0, hdr = labelText(b.heading, b.n, S), i, ls, k, line, bw, txt, anyDetail = false;
+    b.lines.forEach(function (l) { if (l.text.trim() || String(l.n).trim()) anyDetail = true; });
+    if (hdr) {
+      ls = wrap(hdr, inner, function (t) { return m(t, S.headingBold); });
+      ls.forEach(function (t) { items.push({ t: t, bold: S.headingBold, align: S.align, x: 0, dy: y }); y += lh; });
+      if (anyDetail) y += fs * 0.3;
+    }
+    b.lines.forEach(function (l) {
+      txt = labelText(l.text, l.n, S); if (!txt) return;
+      if (l.bullet) {
+        bw = m('•' + NB, false); ls = wrap(txt, inner - bw, function (t) { return m(t, false); });
+        ls.forEach(function (t, idx) { if (idx === 0) items.push({ t: '•', bold: false, align: 'left', x: 0, dy: y }); items.push({ t: t, bold: false, align: 'left', x: bw, dy: y }); y += lh; });
+      } else {
+        ls = wrap(txt, inner, function (t) { return m(t, false); });
+        ls.forEach(function (t) { items.push({ t: t, bold: false, align: 'left', x: 0, dy: y }); y += lh; });
+      }
+    });
+    return { items: items, h: 2 * pad + Math.max(y, lh) };
+  }
+  function geomSingle() {
+    var mainW, mx, sx;
+    if (multi) { mainW = contentW * S.spinePct / 100; mx = x0 + contentW / 2 - mainW / 2; }
+    else if (anySide) { mainW = contentW * S.spinePct / 100; mx = x0; }
+    else { mainW = contentW * 0.6; mx = x0 + (contentW - mainW) / 2; }
+    sx = mx + mainW + S.gapX;
+    return { mx: mx, mainW: mainW, cx: mx + mainW / 2, sx: sx, sideW: x0 + contentW - sx };
+  }
+  var G = geomSingle(), info = [], y = margin, r, i;
+  for (r = 0; r < rows.length; r++) {
+    var R = rows[r], N = R.cells.length, colW = (contentW - (N - 1) * S.gapX) / N, cells = [], maxH = 0;
+    for (i = 0; i < N; i++) {
+      var c = R.cells[i], bx = N === 1 ? G.mx : x0 + i * (colW + S.gapX), bw2 = N === 1 ? G.mainW : colW, ct = boxContent(c.main, bw2);
+      minBoxW = Math.min(minBoxW, bw2); maxH = Math.max(maxH, ct.h);
+      cells.push({ x: bx, w: bw2, cx: bx + bw2 / 2, ct: ct, h: ct.h, side: null });
+    }
+    if (N === 1 && R.cells[0].side.enabled) {
+      if (G.sideW < 22) warnings.push('Row ' + (r + 1) + ': the exclusion box is very narrow. Increase the figure width or reduce the spine box width.');
+      var sct = boxContent(R.cells[0].side, Math.max(G.sideW, 2 * pad + 3)); minBoxW = Math.min(minBoxW, G.sideW);
+      cells[0].side = { x: G.sx, w: G.sideW, ct: sct, h: sct.h };
+    }
+    cells.forEach(function (c) { if (S.equalHeights) c.h = maxH; c.y = y; });
+    var rowBottom = y + (S.equalHeights ? maxH : Math.max.apply(null, cells.map(function (c) { return c.h; })));
+    var hasNext = r < rows.length - 1, gapAfter = S.gapY, nextN = hasNext ? rows[r + 1].cells.length : 0;
+    if (cells[0].side && hasNext) gapAfter = Math.max(S.gapY, nextN === 1 ? cells[0].side.h + 2 * CLR : CLR + cells[0].side.h + CLR + S.gapY * 0.6);
+    if (cells[0].side) {
+      var sd = cells[0].side;
+      if (hasNext) sd.y = nextN === 1 ? rowBottom + (gapAfter - sd.h) / 2 : rowBottom + CLR;
+      else sd.y = Math.max(y, cells[0].y + cells[0].h / 2 - sd.h / 2);
+    }
+    info.push({ cells: cells, top: y, bottom: rowBottom, gapAfter: gapAfter });
+    y = rowBottom + (hasNext ? gapAfter : 0);
+  }
+  var maxY = y;
+  info.forEach(function (ri) { ri.cells.forEach(function (c) { if (c.side) maxY = Math.max(maxY, c.side.y + c.side.h); }); });
+
+  /* display list */
+  function P(o) { dl.push(o); }
+  function drawTexts(items, bx, by, bw) {
+    items.forEach(function (it) {
+      var tw = m(it.t, it.bold), tx = it.align === 'center' ? bx + (bw - tw) / 2 : bx + pad + it.x;
+      P({ k: 'text', x: tx, y: by + pad + it.dy + baseOff, s: it.t, bold: it.bold, size: fs, color: T.text });
+    });
+  }
+  var phaseRects = [];
+  if (hasPhases) {
+    var a = 0;
+    while (a < rows.length) {
+      if (!rows[a].phase) { a++; continue; }
+      var b2 = a; while (b2 + 1 < rows.length && rows[b2 + 1].phase === rows[a].phase) b2++;
+      var top = info[a].top, bot = info[b2].bottom, ls = phaseWrap[rows[a].phase], th = ls.length * lh, ty = top + ((bot - top) - th) / 2;
+      if (S.phaseStyle !== 'none') P({ k: 'rect', x: margin, y: top, w: labelW, h: bot - top, r: S.radius, fill: S.phaseStyle === 'fill' ? T.phaseFill : '#FFFFFF', stroke: T.stroke, sw: sw });
+      ls.forEach(function (t, idx) { P({ k: 'text', x: margin + (labelW - m(t, true)) / 2, y: ty + idx * lh + baseOff, s: t, bold: true, size: fs, color: T.text }); });
+      phaseRects.push({ top: top, bottom: bot }); a = b2 + 1;
+    }
+  }
+  /* connectors */
+  var AL = 2.1, AW = 1.6, lines = [];
+  function seg(pts, head, dir) {                      // polyline, optional arrowhead at the last point
+    var p = pts.map(function (q) { return [q[0], q[1]]; });
+    if (head && S.arrows) {
+      var e = p[p.length - 1], tri = dir === 'right' ? [[e[0] - AL, e[1] - AW / 2], [e[0] - AL, e[1] + AW / 2], [e[0], e[1]]] : [[e[0] - AW / 2, e[1] - AL], [e[0] + AW / 2, e[1] - AL], [e[0], e[1]]];
+      if (dir === 'right') e[0] -= AL * 0.5; else e[1] -= AL * 0.5;
+      P({ k: 'poly', pts: tri, fill: T.stroke });
+    }
+    P({ k: 'line', pts: p, stroke: T.stroke, sw: sw });
+  }
+  for (r = 0; r < rows.length - 1; r++) {
+    var A = info[r], B = info[r + 1], NA = A.cells.length, NB2 = B.cells.length;
+    var src = A.cells.map(function (c) { return { x: c.cx, y: c.y + c.h }; }), dst = B.cells.map(function (c) { return { x: c.cx, y: c.y }; });
+    var sd2 = A.cells[0].side;
+    if (NA === NB2) {
+      for (i = 0; i < NA; i++) {
+        if (Math.abs(src[i].x - dst[i].x) < 0.01) seg([[src[i].x, src[i].y], [dst[i].x, dst[i].y]], true, 'down');
+        else { var my = (src[i].y + dst[i].y) / 2; seg([[src[i].x, src[i].y], [src[i].x, my], [dst[i].x, my], [dst[i].x, dst[i].y]], true, 'down'); }
+      }
+    } else {
+      var busY = A.bottom + A.gapAfter / 2;
+      if (sd2 && NB2 > 1) busY = A.bottom + CLR + sd2.h + CLR + (A.gapAfter - (2 * CLR + sd2.h)) / 2;
+      var xs = src.map(function (q) { return q.x; }).concat(dst.map(function (q) { return q.x; }));
+      src.forEach(function (q) { seg([[q.x, q.y], [q.x, busY]], false); });
+      seg([[Math.min.apply(null, xs), busY], [Math.max.apply(null, xs), busY]], false);
+      dst.forEach(function (q) { seg([[q.x, busY], [q.x, q.y]], true, 'down'); });
+    }
+    if (sd2) seg([[A.cells[0].cx, sd2.y + sd2.h / 2], [sd2.x, sd2.y + sd2.h / 2]], true, 'right');
+  }
+  var lastSide = info[info.length - 1].cells[0].side;
+  if (lastSide) {
+    var lc = info[info.length - 1].cells[0], ay = lc.y + lc.h / 2, by = lastSide.y + lastSide.h / 2, ax = lc.x + lc.w;
+    if (Math.abs(ay - by) < 0.01) seg([[ax, ay], [lastSide.x, by]], true, 'right');
+    else { var mx2 = (ax + lastSide.x) / 2; seg([[ax, ay], [mx2, ay], [mx2, by], [lastSide.x, by]], true, 'right'); }
+  }
+  /* boxes + text */
+  var boxes = [];
+  info.forEach(function (ri, rIdx) {
+    ri.cells.forEach(function (c, cIdx) {
+      P({ k: 'rect', x: c.x, y: c.y, w: c.w, h: c.h, r: S.radius, fill: T.boxFill, stroke: T.stroke, sw: sw });
+      drawTexts(c.ct.items, c.x, c.y, c.w); boxes.push({ row: rIdx, cell: cIdx, kind: 'main', x: c.x, y: c.y, w: c.w, h: c.h });
+      if (c.side) { P({ k: 'rect', x: c.side.x, y: c.side.y, w: c.side.w, h: c.side.h, r: S.radius, fill: T.sideFill, stroke: T.stroke, sw: sw });
+        drawTexts(c.side.ct.items, c.side.x, c.side.y, c.side.w); boxes.push({ row: rIdx, cell: cIdx, kind: 'side', x: c.side.x, y: c.side.y, w: c.side.w, h: c.side.h }); }
+    });
+  });
+  if (minBoxW < 28) warnings.push('Some boxes are narrow (' + minBoxW.toFixed(0) + ' mm). Text may wrap heavily; consider a wider figure or fewer boxes per row.');
+  if (S.fontPt < 6) warnings.push('Font size is below 6 pt; many journals require at least 6–8 pt at final size.');
+  // stable draw order: phase rects and lines first, then boxes, then text
+  var order = { rect: 1, line: 0, poly: 0, text: 2 };
+  var pr = dl.filter(function (d) { return d.k === 'rect' && d.fill === (S.phaseStyle === 'fill' ? T.phaseFill : '#FFFFFF') && d.x === margin && hasPhases && d.w === labelW; });
+  return { dl: dl, W: W, H: maxY + margin, S: S, T: T, warnings: warnings, minBoxW: minBoxW, boxes: boxes, empty: false };
+}
+
+/* ---------- consistency checks ---------- */
+function runChecks(state) {
+  var S = normSettings(state && state.settings), rows = ((state && state.rows) || []).map(normRow), out = [], nChecks = 0, blank = 0;
+  function sumCheck(b, where) {
+    var tot = numVal(b.n); if (!b.checkSum || tot === null) return;
+    var s = 0, cnt = 0; b.lines.forEach(function (l) { var v = numVal(l.n); if (v !== null) { s += v; cnt++; } });
+    if (!cnt) return; nChecks++;
+    if (Math.abs(s - tot) > 1e-9) out.push({ level: 'warn', msg: where + ': the listed reasons add up to ' + s + ', but the total is ' + tot + '.' });
+  }
+  rows.forEach(function (r, ri) {
+    r.cells.forEach(function (c, ci) {
+      var nm = 'Row ' + (ri + 1) + (r.cells.length > 1 ? ', box ' + (ci + 1) : '');
+      [c.main].concat(r.cells.length === 1 && c.side.enabled ? [c.side] : []).forEach(function (b, bi) {
+        sumCheck(b, nm + (bi ? ' (exclusion box)' : ''));
+        if ((b.heading || b.lines.length) && !String(b.n).trim() && (b.heading.trim())) blank++;
+        b.lines.forEach(function (l) { if (l.text.trim() && !String(l.n).trim()) blank++; });
+      });
+    });
+  });
+  for (var r = 0; r < rows.length - 1; r++) {
+    var A = rows[r], B = rows[r + 1], side = A.cells.length === 1 && A.cells[0].side.enabled ? numVal(A.cells[0].side.n) : 0;
+    if (A.cells.length !== 1) continue;
+    var an = numVal(A.cells[0].main.n); if (an === null || side === null) continue;
+    var bs = 0, ok = true; B.cells.forEach(function (c) { var v = numVal(c.main.n); if (v === null) ok = false; else bs += v; });
+    if (!ok) continue; nChecks++;
+    var exp = an - side;
+    if (Math.abs(exp - bs) > 1e-9) out.push({ level: 'warn', msg: 'Row ' + (r + 1) + ' to row ' + (r + 2) + ': ' + an + (side ? ' − ' + side + ' excluded = ' + exp : '') + ', but the next row totals ' + bs + '.' });
+  }
+  var bad = {}, all = JSON.stringify(rows);
+  all.split('').forEach(function (ch) { if (ch.charCodeAt(0) > 126 && !SYM[ch] && !WIN[ch] && ch.charCodeAt(0) > 255) bad[ch] = 1; });
+  var badc = Object.keys(bad).filter(function (c) { return c !== ' '; });
+  if (badc.length && FONTS[S.fontKey].std) out.push({ level: 'info', msg: 'PDF export: ' + badc.join(' ') + ' is not in the standard PDF fonts and will print as ?. SVG and PNG are unaffected.' });
+  if (blank) out.push({ level: 'info', msg: blank + (blank > 1 ? ' boxes or lines have' : ' box or line has') + ' no count (n) yet.' });
+  return { items: out, nChecks: nChecks };
+}
+
+/* ---------- SVG ---------- */
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function f3(n) { return (Math.round(n * 1000) / 1000).toString(); }
+function toSVG(out, opts) {
+  opts = opts || {}; var S = out.S, T = out.T, ff = FONTS[S.fontKey].stack.replace(/"/g, '&quot;'), W = out.W, H = out.H, i, s = [];
+  s.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + f3(W) + 'mm" height="' + f3(H) + 'mm" viewBox="0 0 ' + f3(W) + ' ' + f3(H) + '" role="img" aria-label="' + esc(opts.title || 'Flow diagram') + '">');
+  s.push('<title>' + esc(opts.title || 'Flow diagram') + '</title>');
+  if (!(S.transparent && opts.export)) s.push('<rect x="0" y="0" width="' + f3(W) + '" height="' + f3(H) + '" fill="#FFFFFF"/>');
+  var lines = [], rects = [], polys = [], texts = [];
+  out.dl.forEach(function (d) {
+    if (d.k === 'rect') rects.push('<rect x="' + f3(d.x) + '" y="' + f3(d.y) + '" width="' + f3(d.w) + '" height="' + f3(d.h) + '"' + (d.r ? ' rx="' + f3(d.r) + '"' : '') + ' fill="' + d.fill + '" stroke="' + d.stroke + '" stroke-width="' + f3(d.sw) + '"/>');
+    else if (d.k === 'line') lines.push('<polyline points="' + d.pts.map(function (p) { return f3(p[0]) + ',' + f3(p[1]); }).join(' ') + '" fill="none" stroke="' + d.stroke + '" stroke-width="' + f3(d.sw) + '"/>');
+    else if (d.k === 'poly') polys.push('<polygon points="' + d.pts.map(function (p) { return f3(p[0]) + ',' + f3(p[1]); }).join(' ') + '" fill="' + d.fill + '"/>');
+    else texts.push('<text x="' + f3(d.x) + '" y="' + f3(d.y) + '" font-size="' + f3(d.size) + '"' + (d.bold ? ' font-weight="bold"' : '') + ' fill="' + d.color + '">' + esc(d.s.replace(/ /g, ' ')) + '</text>');
+  });
+  s.push('<g stroke-linecap="butt" stroke-linejoin="miter">' + lines.join('') + '</g>');
+  s.push('<g>' + rects.join('') + '</g>'); s.push('<g>' + polys.join('') + '</g>');
+  s.push('<g font-family="' + ff + '" xml:space="preserve">' + texts.join('') + '</g></svg>');
+  return s.join('\\n');
+}
+
+/* ---------- PDF (vector, standard fonts) ---------- */
+function toPDF(out, title) {
+  var S = out.S, k = 72 / 25.4, Wp = out.W * k, Hp = out.H * k, c = [], bad = {};
+  var pf = function (n) { return (Math.round(n * 1000) / 1000).toString(); };
+  var X = function (x) { return pf(x * k); }, Y = function (y) { return pf(Hp - y * k); };
+  var rgb = function (h) { h = h.replace('#', ''); return [0, 2, 4].map(function (i) { return pf(parseInt(h.substr(i, 2), 16) / 255); }).join(' '); };
+  var fkey = function (bold) { return S.fontKey === 'times' ? (bold ? 'F4' : 'F3') : (bold ? 'F2' : 'F1'); };
+  function oct(b) { return '\\\\' + ('00' + b.toString(8)).slice(-3); }
+  function enc(str) {                       // split into WinAnsi / Symbol segments
+    var segs = [], cur = null, i, ch, code, sym, bytes;
+    for (i = 0; i < str.length; i++) {
+      ch = str.charAt(i); code = ch.charCodeAt(0);
+      if (SYM[ch]) { sym = true; bytes = SYM[ch][0]; }
+      else { sym = false; if (code === 160) bytes = 160; else if (code >= 32 && code < 127) bytes = code; else if (WIN[ch] !== undefined) bytes = WIN[ch]; else if (code >= 161 && code <= 255) bytes = code; else { bytes = 63; bad[ch] = 1; } }
+      if (!cur || cur.sym !== sym) { cur = { sym: sym, s: '', chars: '' }; segs.push(cur); }
+      cur.s += oct(bytes); cur.chars += ch;
+    }
+    return segs;
+  }
+  function rr(x, y, w, h, r) {              // rounded rect path (pdf coords)
+    var x0 = x * k, y0 = Hp - (y + h) * k, ww = w * k, hh = h * k, rad = Math.min(r * k, ww / 2, hh / 2), kap = 0.5523 * rad, P = pf;
+    if (rad <= 0.01) return P(x0) + ' ' + P(y0) + ' ' + P(ww) + ' ' + P(hh) + ' re\\n';
+    return P(x0 + rad) + ' ' + P(y0) + ' m ' + P(x0 + ww - rad) + ' ' + P(y0) + ' l ' + P(x0 + ww - rad + kap) + ' ' + P(y0) + ' ' + P(x0 + ww) + ' ' + P(y0 + rad - kap) + ' ' + P(x0 + ww) + ' ' + P(y0 + rad) + ' c ' +
+      P(x0 + ww) + ' ' + P(y0 + hh - rad) + ' l ' + P(x0 + ww) + ' ' + P(y0 + hh - rad + kap) + ' ' + P(x0 + ww - rad + kap) + ' ' + P(y0 + hh) + ' ' + P(x0 + ww - rad) + ' ' + P(y0 + hh) + ' c ' +
+      P(x0 + rad) + ' ' + P(y0 + hh) + ' l ' + P(x0 + rad - kap) + ' ' + P(y0 + hh) + ' ' + P(x0) + ' ' + P(y0 + hh - rad + kap) + ' ' + P(x0) + ' ' + P(y0 + hh - rad) + ' c ' +
+      P(x0) + ' ' + P(y0 + rad) + ' l ' + P(x0) + ' ' + P(y0 + rad - kap) + ' ' + P(x0 + rad - kap) + ' ' + P(y0) + ' ' + P(x0 + rad) + ' ' + P(y0) + ' c h\\n';
+  }
+  c.push('0 J 0 j\\n');
+  var order = ['line', 'rect', 'poly', 'text'], groups = { line: [], rect: [], poly: [], text: [] };
+  out.dl.forEach(function (d) { groups[d.k].push(d); });
+  groups.line.forEach(function (d) { c.push(pf(d.sw * k) + ' w ' + rgb(d.stroke) + ' RG\\n'); d.pts.forEach(function (p, i) { c.push(X(p[0]) + ' ' + Y(p[1]) + (i ? ' l ' : ' m ')); }); c.push('S\\n'); });
+  groups.rect.forEach(function (d) { c.push(pf(d.sw * k) + ' w ' + rgb(d.stroke) + ' RG ' + rgb(d.fill) + ' rg\\n' + rr(d.x, d.y, d.w, d.h, d.r) + 'B\\n'); });
+  groups.poly.forEach(function (d) { c.push(rgb(d.fill) + ' rg\\n'); d.pts.forEach(function (p, i) { c.push(X(p[0]) + ' ' + Y(p[1]) + (i ? ' l ' : ' m ')); }); c.push('h f\\n'); });
+  groups.text.forEach(function (d) {
+    var x = d.x; c.push(rgb(d.color) + ' rg\\n');
+    enc(d.s).forEach(function (sg) {
+      var fnt = sg.sym ? 'F5' : fkey(d.bold), w = 0, i;
+      for (i = 0; i < sg.chars.length; i++) w += cw(S.fontKey === 'aptos' ? 'arial' : S.fontKey, d.bold, sg.chars.charAt(i));
+      c.push('BT /' + fnt + ' ' + pf(d.size * k) + ' Tf ' + X(x) + ' ' + Y(d.y) + ' Td (' + sg.s + ') Tj ET\\n'); x += w * d.size / 1000;
+    });
+  });
+  var content = c.join(''), H = 'Helvetica', objs = [];
+  var fonts = S.fontKey === 'times' ? ['Times-Roman', 'Times-Bold'] : ['Helvetica', 'Helvetica-Bold'];
+  objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objs[2] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+  objs[3] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pf(Wp) + ' ' + pf(Hp) + '] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R /F5 9 0 R >> >> /Contents 4 0 R >>';
+  objs[4] = '<< /Length ' + content.length + ' >>\\nstream\\n' + content + 'endstream';
+  objs[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+  objs[6] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+  objs[7] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>';
+  objs[8] = '<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>';
+  objs[9] = '<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>';
+  objs[10] = '<< /Title (' + String(title || 'Flow diagram').replace(/[()\\\\]/g, '').replace(/[^\\x20-\\x7E]/g, '') + ') /Producer (CONSORT flow diagram builder) >>';
+  var pdf = '%PDF-1.4\\n%\\xE2\\xE3\\xCF\\xD3\\n', offs = [], i2;
+  for (i2 = 1; i2 <= 10; i2++) { offs[i2] = pdf.length; pdf += i2 + ' 0 obj\\n' + objs[i2] + '\\nendobj\\n'; }
+  var xref = pdf.length; pdf += 'xref\\n0 11\\n0000000000 65535 f \\n';
+  for (i2 = 1; i2 <= 10; i2++) pdf += ('0000000000' + offs[i2]).slice(-10) + ' 00000 n \\n';
+  pdf += 'trailer\\n<< /Size 11 /Root 1 0 R /Info 10 0 R >>\\nstartxref\\n' + xref + '\\n%%EOF\\n';
+  var bytes = new Uint8Array(pdf.length); for (i2 = 0; i2 < pdf.length; i2++) bytes[i2] = pdf.charCodeAt(i2) & 255;
+  return { bytes: bytes, replaced: Object.keys(bad) };
+}
+
+/* ---------- PNG: add pHYs (dpi) chunk ---------- */
+var _crc = null;
+function crc32(buf, start, end) {
+  if (!_crc) { _crc = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; _crc[n] = c >>> 0; } }
+  var crc = 0xFFFFFFFF; for (var i = start; i < end; i++) crc = _crc[(crc ^ buf[i]) & 255] ^ (crc >>> 8); return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function pngSetDpi(bytes, dpi) {              // bytes: Uint8Array of a PNG; returns new Uint8Array with a pHYs chunk after IHDR
+  var ppm = Math.round(dpi / 0.0254), chunk = new Uint8Array(21), dv = new DataView(chunk.buffer);
+  dv.setUint32(0, 9); chunk.set([0x70, 0x48, 0x59, 0x73], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); chunk[16] = 1;
+  dv.setUint32(17, crc32(chunk, 4, 17));
+  var out = new Uint8Array(bytes.length + 21), cut = 33;                 // 8 (signature) + 25 (IHDR chunk)
+  out.set(bytes.subarray(0, cut), 0); out.set(chunk, cut); out.set(bytes.subarray(cut), cut + 21);
+  return out;
+}
+
+var api = { setWidths: setWidths, FONTS: FONTS, THEMES: THEMES, DEFAULTS: DEFAULTS, normSettings: normSettings, layout: layout, runChecks: runChecks, toSVG: toSVG, toPDF: toPDF, pngSetDpi: pngSetDpi, numVal: numVal, measure: measure };
+if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CF = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* Starter diagrams (example numbers add up; they are placeholders to overwrite or clear). */
+(function (root) {
+'use strict';
+function L(text, n, bullet) { return { text: text, n: n == null ? '' : String(n), bullet: !!bullet }; }
+function B(heading, n, lines, checkSum) { return { enabled: true, heading: heading, n: n == null ? '' : String(n), lines: lines || [], checkSum: !!checkSum }; }
+function cell(main, side) { return { main: main, side: side || { enabled: false, heading: 'Excluded', n: '', lines: [], checkSum: true } }; }
+function noSide() { return { enabled: false, heading: 'Excluded', n: '', lines: [], checkSum: true }; }
+function armCells(names, nAlloc, rec, notRec, lost, disc, analysed, exclAn) {
+  return names.map(function (nm, i) { return { alloc: B('Allocated to ' + nm, nAlloc[i], [L('Received allocated intervention', rec[i]), L('Did not receive allocated intervention (give reasons)', notRec[i])], true),
+    fu: B('', '', [L('Lost to follow-up (give reasons)', lost[i]), L('Discontinued intervention (give reasons)', disc[i])], false),
+    an: B('Analysed', analysed[i], [L('Excluded from analysis (give reasons)', exclAn[i])], false) }; });
+}
+function rct(arms) {
+  var names = arms === 2 ? ['intervention', 'control'] : ['intervention A', 'intervention B', 'control'];
+  var A = arms === 2 ? [125, 125] : [84, 83, 83], rec = arms === 2 ? [122, 125] : [82, 81, 83], not = arms === 2 ? [3, 0] : [2, 2, 0];
+  var lost = arms === 2 ? [6, 5] : [4, 3, 3], disc = arms === 2 ? [4, 3] : [2, 2, 1], an = arms === 2 ? [115, 117] : [78, 78, 79], ex = arms === 2 ? [0, 0] : [0, 0, 0];
+  var c = armCells(names, A, rec, not, lost, disc, an, ex), tot = A.reduce(function (a, b) { return a + b; }, 0);
+  var sideEx = B('Excluded', 62, [L('Not meeting inclusion criteria', 38, true), L('Declined to participate', 17, true), L('Other reasons', 7, true)], true);
+  return { rows: [
+    { phase: 'Enrollment', cells: [cell(B('Assessed for eligibility', tot + 62, []), sideEx)] },
+    { phase: 'Enrollment', cells: [cell(B('Randomized', tot, []), noSide())] },
+    { phase: 'Allocation', cells: c.map(function (x) { return cell(x.alloc, noSide()); }) },
+    { phase: 'Follow-Up', cells: c.map(function (x) { return cell(x.fu, noSide()); }) },
+    { phase: 'Analysis', cells: c.map(function (x) { return cell(x.an, noSide()); }) } ] };
+}
+function cohort() {
+  return { rows: [
+    { phase: 'Identification', cells: [cell(B('Patients identified in the database', 620, []), B('Excluded before screening', 120, [L('Revision ACLR', 45, true), L('Contralateral ACL injury', 30, true), L('Other', 45, true)], true))] },
+    { phase: 'Eligibility', cells: [cell(B('Assessed for eligibility', 500, []), B('Excluded', 380, [L('Insufficient testing data', 350, true), L('Multiligament surgery', 20, true), L('Other', 10, true)], true))] },
+    { phase: 'Included', cells: [cell(B('Included in the analysis', 120, []), noSide())] },
+    { phase: 'Analysis', cells: [cell(B('Comparison group', 100, []), noSide()), cell(B('Exposure group', 20, []), noSide())] } ] };
+}
+function blank() { return { rows: [{ phase: '', cells: [cell(B('Box', '', []), noSide())] }] }; }
+var TEMPLATES = {
+  rct2: { label: 'CONSORT 2010, two-arm trial', note: 'Enrollment, allocation, follow-up and analysis for a parallel-group trial.', build: function () { return rct(2); } },
+  rct3: { label: 'CONSORT 2010, three-arm trial', note: 'Same layout with three arms.', build: function () { return rct(3); } },
+  cohort: { label: 'Observational study (STROBE-style)', note: 'Sequential exclusions, then a split into two groups.', build: cohort },
+  blank: { label: 'Blank', note: 'One empty box; add rows as needed.', build: blank }
+};
+var api = { TEMPLATES: TEMPLATES, L: L, B: B, cell: cell };
+if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.CFT = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>(function () {
+'use strict';
+var CF = window.CF, CFT = window.CFT; CF.setWidths(window.__WIDTHS__);
+var LS = 'consort-flow-builder-v1';
+var PHASES = ['Identification', 'Screening', 'Eligibility', 'Enrollment', 'Allocation', 'Follow-Up', 'Included', 'Analysis'];
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
+function getPath(o, p) { return p.split('.').reduce(function (a, k) { return a == null ? undefined : a[k]; }, o); }
+function setPath(o, p, v) { var ks = p.split('.'), last = ks.pop(), t = o; ks.forEach(function (k) { t = t[k]; }); t[last] = v; }
+
+/* ---------- state, history, persistence ---------- */
+function fresh(key) { return { settings: {}, rows: CFT.TEMPLATES[key].build().rows }; }
+function loadSaved() { try { var s = JSON.parse(localStorage.getItem(LS)); if (s && Array.isArray(s.rows) && s.rows.length) return { settings: s.settings || {}, rows: s.rows }; } catch (e) {} return null; }
+var state = loadSaved() || fresh('rct2');
+state.settings = Object.assign({}, CF.DEFAULTS, state.settings);
+var undoStack = [], redoStack = [], lastSnap = JSON.stringify(state), burstBase = null, burstTimer = null, saveTimer = null, zoom = 'fit', lastOut = null;
+function snap() { return JSON.stringify(state); }
+function flushBurst() { clearTimeout(burstTimer); if (burstBase !== null) { if (burstBase !== snap()) { undoStack.push(burstBase); redoStack.length = 0; } burstBase = null; lastSnap = snap(); } }
+function before() { flushBurst(); undoStack.push(snap()); if (undoStack.length > 60) undoStack.shift(); redoStack.length = 0; }
+function noteEdit() { if (burstBase === null) burstBase = lastSnap; clearTimeout(burstTimer); burstTimer = setTimeout(function () { flushBurst(); updateHistoryButtons(); }, 700); updateHistoryButtons(); }
+function updateHistoryButtons() { $('undoBtn').disabled = !(undoStack.length || (burstBase !== null && burstBase !== snap())); $('redoBtn').disabled = !redoStack.length; }
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(function () { try { localStorage.setItem(LS, snap()); } catch (e) {} }, 300); }
+function restore(s) { state = JSON.parse(s); state.settings = Object.assign({}, CF.DEFAULTS, state.settings); lastSnap = s; renderAll(); }
+function undo() { flushBurst(); if (!undoStack.length) return; redoStack.push(snap()); restore(undoStack.pop()); updateHistoryButtons(); save(); }
+function redo() { if (!redoStack.length) return; undoStack.push(snap()); restore(redoStack.pop()); updateHistoryButtons(); save(); }
+
+/* ---------- editor ---------- */
+var FIELDS = [
+  { g: 'Size and type', items: [
+    { k: 'widthMm', t: 'num', l: 'Figure width (mm)', min: 40, max: 400, step: 1, width: true },
+    { k: 'fontKey', t: 'sel', l: 'Font', opts: [['arial', 'Arial / Helvetica'], ['times', 'Times New Roman'], ['aptos', 'Aptos (SVG and PNG only)']] },
+    { k: 'fontPt', t: 'num', l: 'Font size (pt)', min: 5, max: 14, step: 0.5 },
+    { k: 'linePt', t: 'num', l: 'Line weight (pt)', min: 0.25, max: 2, step: 0.25 }] },
+  { g: 'Boxes', items: [
+    { k: 'radius', t: 'num', l: 'Corner radius (mm)', min: 0, max: 4, step: 0.2 },
+    { k: 'align', t: 'sel', l: 'Heading alignment', opts: [['center', 'Centered'], ['left', 'Left']] },
+    { k: 'spinePct', t: 'num', l: 'Main box width (% of diagram)', min: 25, max: 80, step: 1 },
+    { k: 'gapY', t: 'num', l: 'Row spacing (mm)', min: 3, max: 30, step: 0.5 },
+    { k: 'gapX', t: 'num', l: 'Column spacing (mm)', min: 2, max: 20, step: 0.5 },
+    { k: 'pad', t: 'num', l: 'Box padding (mm)', min: 0.8, max: 5, step: 0.2 },
+    { k: 'headingBold', t: 'chk', l: 'Bold headings' },
+    { k: 'equalHeights', t: 'chk', l: 'Equal box heights in each row' }] },
+  { g: 'Labels and numbers', items: [
+    { k: 'showPhases', t: 'chk', l: 'Show phase labels on the left' },
+    { k: 'phaseStyle', t: 'sel', l: 'Phase label style', opts: [['fill', 'Filled box'], ['outline', 'Outlined box'], ['none', 'Text only']] },
+    { k: 'nFormat', t: 'sel', l: 'Count format', opts: [['paren_eq', '(n = 100)'], ['paren', '(n=100)'], ['eq', 'n = 100'], ['paren_num', '(100)'], ['plain', '100']] },
+    { k: 'thousands', t: 'chk', l: 'Thousands separators (1,234)' }] },
+  { g: 'Color', items: [
+    { k: 'theme', t: 'sel', l: 'Color theme', opts: [['bw', 'Black and white'], ['grey', 'Greyscale'], ['uva', 'UVA blue, light orange exclusions']] },
+    { k: 'arrows', t: 'chk', l: 'Arrowheads' },
+    { k: 'transparent', t: 'chk', l: 'Transparent background (SVG, PNG)' }] }
+];
+var WIDTHS = [[85, 'One column (85 mm)'], [114, '1.5 columns (114 mm)'], [140, '140 mm'], [170, 'Two columns (170 mm)'], [190, 'Full page (190 mm)']];
+function buildSettings() {
+  var h = '';
+  FIELDS.forEach(function (g) {
+    h += '<fieldset class="setgrp"><legend>' + esc(g.g) + '</legend><div class="setgrid">';
+    g.items.forEach(function (f) {
+      var p = 'settings.' + f.k;
+      if (f.t === 'chk') h += '<label class="chk" style="grid-column:1/-1"><input type="checkbox" data-p="' + p + '"> ' + esc(f.l) + '</label>';
+      else if (f.t === 'sel') h += '<label class="fld">' + esc(f.l) + '<select data-p="' + p + '">' + f.opts.map(function (o) { return '<option value="' + o[0] + '">' + esc(o[1]) + '</option>'; }).join('') + '</select></label>';
+      else if (f.width) h += '<label class="fld" style="grid-column:1/-1">' + esc(f.l) + '<span class="wrow"><select id="wpreset" data-act="wpreset" aria-label="Width preset">' + WIDTHS.map(function (w) { return '<option value="' + w[0] + '">' + esc(w[1]) + '</option>'; }).join('') + '<option value="custom">Custom</option></select><input type="number" data-p="' + p + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '" style="max-width:110px"></span><span class="note" id="widthIn"></span></label>';
+      else h += '<label class="fld">' + esc(f.l) + '<input type="number" data-p="' + p + '" min="' + f.min + '" max="' + f.max + '" step="' + f.step + '"></label>';
+    });
+    h += '</div></fieldset>';
+  });
+  $('settings').innerHTML = h;
+}
+function syncSettings() {
+  document.querySelectorAll('#settings [data-p], #projName, #dpi').forEach(function (n) {
+    var v = getPath(state, n.getAttribute('data-p')); if (n.type === 'checkbox') n.checked = !!v; else n.value = v == null ? '' : v;
+  });
+  var w = +state.settings.widthMm, sel = $('wpreset'); if (sel) { sel.value = WIDTHS.some(function (x) { return x[0] === w; }) ? String(w) : 'custom'; }
+  var wi = $('widthIn'); if (wi) wi.textContent = '= ' + (w / 25.4).toFixed(2) + ' in';
+}
+function lineHTML(path, l, j) {
+  var P = path + '.lines.' + j;
+  return '<div class="line"><input type="text" data-p="' + P + '.text" value="' + esc(l.text) + '" aria-label="Detail text" placeholder="Reason or description">' +
+    '<input type="text" data-p="' + P + '.n" value="' + esc(l.n) + '" aria-label="Count for this line" placeholder="n" inputmode="numeric">' +
+    '<label class="chk" title="Show a bullet"><input type="checkbox" data-p="' + P + '.bullet"' + (l.bullet ? ' checked' : '') + '>•</label>' +
+    '<button class="icon" type="button" data-act="lineUp" data-path="' + path + '" data-j="' + j + '" aria-label="Move line up">↑</button>' +
+    '<button class="icon" type="button" data-act="lineDown" data-path="' + path + '" data-j="' + j + '" aria-label="Move line down">↓</button>' +
+    '<button class="icon" type="button" data-act="delLine" data-path="' + path + '" data-j="' + j + '" aria-label="Remove line">✕</button></div>';
+}
+function boxHTML(path, b, title, isSide) {
+  return '<fieldset class="box"><legend>' + esc(title) + '</legend>' +
+    '<div class="two"><label class="fld">Heading<input type="text" data-p="' + path + '.heading" value="' + esc(b.heading) + '" placeholder="e.g. Assessed for eligibility"></label>' +
+    '<label class="fld">Count (n)<input type="text" data-p="' + path + '.n" value="' + esc(b.n) + '" inputmode="numeric"></label></div>' +
+    '<div>' + b.lines.map(function (l, j) { return lineHTML(path, l, j); }).join('') + '</div>' +
+    '<div class="boxfoot"><button class="btn small" type="button" data-act="addLine" data-path="' + path + '" data-side="' + (isSide ? 1 : 0) + '">+ Add detail line</button>' +
+    '<label class="chk"><input type="checkbox" data-p="' + path + '.checkSum"' + (b.checkSum ? ' checked' : '') + '> Details add up to the count</label></div></fieldset>';
+}
+function rowHTML(r, ri) {
+  var N = r.cells.length, h = '<article class="row-card"><div class="row-head"><span class="rn">Row ' + (ri + 1) + '</span>' +
+    '<label class="fld">Phase label<input type="text" list="phases" data-p="rows.' + ri + '.phase" value="' + esc(r.phase) + '" placeholder="optional"></label>' +
+    '<label class="fld">Boxes<select data-act="ncells" data-ri="' + ri + '">' + [1, 2, 3, 4].map(function (k) { return '<option' + (k === N ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></label>' +
+    '<span class="btns"><button class="icon" type="button" data-act="rowUp" data-ri="' + ri + '" aria-label="Move row up">↑</button><button class="icon" type="button" data-act="rowDown" data-ri="' + ri + '" aria-label="Move row down">↓</button>' +
+    '<button class="icon" type="button" data-act="rowDup" data-ri="' + ri + '" aria-label="Duplicate row" title="Duplicate">⧉</button><button class="icon" type="button" data-act="rowDel" data-ri="' + ri + '" aria-label="Delete row">✕</button></span></div>';
+  r.cells.forEach(function (c, ci) { h += boxHTML('rows.' + ri + '.cells.' + ci + '.main', c.main, N > 1 ? 'Box ' + (ci + 1) : 'Main box', false); });
+  if (N > 1) h += '<div class="add-row" style="margin:0 0 6px"><button class="btn small" type="button" data-act="copyBox" data-ri="' + ri + '">Copy box 1 to the other boxes</button></div><p class="note">Exclusion boxes are available when a row has a single box.</p>';
+  else {
+    var sd = r.cells[0].side, sp = 'rows.' + ri + '.cells.0.side';
+    h += '<label class="chk" style="margin:2px 0 6px"><input type="checkbox" data-p="' + sp + '.enabled" data-act="sidetoggle"' + (sd.enabled ? ' checked' : '') + '> Add an exclusion box to the right of this box</label>';
+    if (sd.enabled) h += boxHTML(sp, sd, 'Exclusion box', true);
+  }
+  return h + '</article>';
+}
+function renderEditor() {
+  $('rows').innerHTML = state.rows.map(rowHTML).join('') + '<datalist id="phases">' + PHASES.map(function (p) { return '<option value="' + p + '">'; }).join('') + '</datalist>';
+}
+function renderTemplates() {
+  $('tplGrid').innerHTML = Object.keys(CFT.TEMPLATES).map(function (k) { var t = CFT.TEMPLATES[k]; return '<button class="tpl" type="button" data-act="tpl" data-key="' + k + '"><b>' + esc(t.label) + '</b><span>' + esc(t.note) + '</span></button>'; }).join('');
+}
+
+/* ---------- preview, checks ---------- */
+function applyZoom(out) {
+  var s = $('paper').querySelector('svg'); if (!s) return; s.removeAttribute('width'); s.removeAttribute('height');
+  if (zoom === 'fit') { s.style.width = '100%'; s.style.height = 'auto'; } else { s.style.width = (out.W * 96 / 25.4 * (+zoom) / 100) + 'px'; s.style.height = 'auto'; }
+}
+function renderChecks(out) {
+  var ck = CF.runChecks(state), items = [], i;
+  out.warnings.forEach(function (w) { items.push({ level: 'warn', msg: w }); });
+  ck.items.forEach(function (x) { items.push(x); });
+  if (!items.some(function (x) { return x.level === 'warn'; })) items.unshift({ level: 'ok', msg: ck.nChecks ? 'All ' + ck.nChecks + ' number check' + (ck.nChecks > 1 ? 's' : '') + ' passed.' : 'No number checks yet. Fill in the counts to compare totals across rows.' });
+  var tag = { warn: 'Warning: ', info: 'Note: ', ok: 'OK: ' }, mark = { warn: '⚠ ', info: 'ℹ ', ok: '✓ ' };
+  $('checks').innerHTML = items.map(function (x) { return '<li class="' + x.level + '"><span class="vh">' + tag[x.level] + '</span>' + mark[x.level] + esc(x.msg) + '</li>'; }).join('');
+}
+function renderPreview() {
+  var out;
+  try { out = CF.layout(state); } catch (e) { $('paper').innerHTML = '<p style="color:#900;margin:8px">Could not draw the diagram: ' + esc(e.message) + '</p>'; return; }
+  lastOut = out;
+  if (out.empty) { $('paper').innerHTML = '<p style="color:#555;margin:8px">Add a row to start building the diagram.</p>'; $('sizeInfo').textContent = ''; $('checks').innerHTML = ''; return; }
+  $('paper').innerHTML = CF.toSVG(out, { title: state.settings.projectName || 'Flow diagram' });
+  applyZoom(out);
+  var S = out.S, px = Math.round(out.W / 25.4 * S.dpi), py = Math.round(out.H / 25.4 * S.dpi);
+  $('sizeInfo').textContent = 'Final size ' + out.W.toFixed(0) + ' × ' + out.H.toFixed(0) + ' mm (' + (out.W / 25.4).toFixed(2) + ' × ' + (out.H / 25.4).toFixed(2) + ' in). PNG at ' + S.dpi + ' dpi: ' + px + ' × ' + py + ' px. Text ' + S.fontPt + ' pt.';
+  $('pdfBtn').title = CF.FONTS[S.fontKey].std ? '' : 'PDF export needs Arial or Times New Roman';
+  renderChecks(out);
+}
+function commit() { save(); renderPreview(); }
+function renderAll() { renderEditor(); syncSettings(); renderPreview(); updateHistoryButtons(); }
+
+/* ---------- saving files ---------- */
+var dlPromise = null;
+function getDownloads() {
+  if (!dlPromise) dlPromise = (window.claude && typeof window.claude.use === 'function') ? Promise.resolve(window.claude.use('downloads')).catch(function () { return null; }) : Promise.resolve(null);
+  return dlPromise;
+}
+function status(msg, bad) { var s = $('status'); s.textContent = msg; s.style.color = bad ? 'var(--warn-ink)' : 'var(--ok-ink)'; }
+async function saveFile(name, data, mime) {
+  var dl = await getDownloads();
+  if (dl) {
+    try { await dl.save({ filename: name, data: data }); status('Ready: ' + name); return; }
+    catch (e) {
+      var c = e && e.code;
+      if (c === 'declined') { status('Save cancelled.', true); return; }
+      if (c === 'too_large') { status('That file is too large to save here. Try a lower resolution.', true); return; }
+      if (c && ['unavailable', 'not_granted', 'capability_disabled', 'capability_removed'].indexOf(c) < 0) { status('Could not save the file (' + c + ').', true); return; }
+    }
+  }
+  var blob = data instanceof Blob ? data : new Blob([data], { type: mime }), url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  status('Downloaded ' + name);
+}
+function baseName() { return (String(state.settings.projectName || 'consort-flow').trim().replace(/[^\\w\\-. ]+/g, '').replace(/\\s+/g, '-') || 'consort-flow'); }
+async function exSvg() { flushBurst(); var out = CF.layout(state); if (out.empty) return status('Nothing to export yet.', true); await saveFile(baseName() + '.svg', '<?xml version="1.0" encoding="UTF-8"?>\\n' + CF.toSVG(out, { title: state.settings.projectName, export: true }), 'image/svg+xml'); }
+async function exPdf() {
+  var out = CF.layout(state); if (out.empty) return status('Nothing to export yet.', true);
+  if (!CF.FONTS[out.S.fontKey].std) return status('PDF export needs Arial or Times New Roman. Pick one of those fonts, or export SVG or PNG.', true);
+  var r = CF.toPDF(out, state.settings.projectName); await saveFile(baseName() + '.pdf', r.bytes, 'application/pdf');
+  if (r.replaced.length) status('PDF saved. These characters are not in the standard PDF fonts and print as ?: ' + r.replaced.join(' '), true);
+}
+async function exPng() {
+  var out = CF.layout(state); if (out.empty) return status('Nothing to export yet.', true);
+  var S = out.S, dpi = S.dpi, cw = Math.round(out.W / 25.4 * dpi), ch = Math.round(out.H / 25.4 * dpi);
+  if (cw * ch > 190e6) return status('That size is too large for this browser. Choose a lower resolution.', true);
+  status('Rendering PNG…');
+  try {
+    var svg = CF.toSVG(out, { title: state.settings.projectName, export: true }), img = new Image();
+    await new Promise(function (res, rej) { img.onload = res; img.onerror = function () { rej(new Error('The browser could not render the diagram.')); }; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; var cx = cv.getContext('2d');
+    if (!S.transparent) { cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, cw, ch); }
+    cx.drawImage(img, 0, 0, cw, ch);
+    var blob = await new Promise(function (res) { cv.toBlob(res, 'image/png'); }); if (!blob) throw new Error('The browser could not create the PNG.');
+    var bytes = CF.pngSetDpi(new Uint8Array(await blob.arrayBuffer()), dpi);
+    await saveFile(baseName() + '.png', bytes, 'image/png');
+  } catch (e) { status('PNG export failed: ' + e.message, true); }
+}
+async function saveJson() { flushBurst(); await saveFile(baseName() + '.json', JSON.stringify({ app: 'consort-flow-builder', version: 1, settings: state.settings, rows: state.rows }, null, 2), 'application/json'); }
+function loadFromText(txt) {
+  try {
+    var o = JSON.parse(txt); if (!o || !Array.isArray(o.rows) || !o.rows.length) throw new Error('No diagram rows found.');
+    before(); state = { settings: Object.assign({}, CF.DEFAULTS, o.settings || {}), rows: o.rows }; lastSnap = snap(); renderAll(); save(); status('Project loaded.');
+  } catch (e) { status('Could not load that project: ' + e.message, true); }
+}
+
+/* ---------- actions ---------- */
+function newCell(heading) { return CFT.cell(CFT.B(heading, '', [], false)); }
+function newRow(type) {
+  var n = { single: 1, 'single-excl': 1, two: 2, three: 3, four: 4 }[type], cells = [], i;
+  for (i = 0; i < n; i++) cells.push(newCell(n > 1 ? 'Box ' + (i + 1) : 'Box'));
+  if (type === 'single-excl') cells[0].side = { enabled: true, heading: 'Excluded', n: '', lines: [CFT.L('Reason', '', true)], checkSum: true };
+  return { phase: '', cells: cells };
+}
+function move(arr, i, d) { var j = i + d; if (j < 0 || j >= arr.length) return false; var t = arr[i]; arr[i] = arr[j]; arr[j] = t; return true; }
+function act(a, b) {
+  var ri = +b.getAttribute('data-ri'), path = b.getAttribute('data-path'), j = +b.getAttribute('data-j'), box;
+  switch (a) {
+    case 'undo': undo(); return; case 'redo': redo(); return;
+    case 'tpl': before(); state.rows = CFT.TEMPLATES[b.getAttribute('data-key')].build().rows; renderAll(); save(); return;
+    case 'clearNums': before(); state.rows.forEach(function (r) { r.cells.forEach(function (c) { [c.main, c.side].forEach(function (x) { x.n = ''; x.lines.forEach(function (l) { l.n = ''; }); }); }); }); renderAll(); save(); return;
+    case 'addRow': before(); state.rows.push(newRow(b.getAttribute('data-type'))); renderAll(); save(); return;
+    case 'rowUp': before(); move(state.rows, ri, -1); renderAll(); save(); return;
+    case 'rowDown': before(); move(state.rows, ri, 1); renderAll(); save(); return;
+    case 'rowDup': before(); state.rows.splice(ri + 1, 0, clone(state.rows[ri])); renderAll(); save(); return;
+    case 'rowDel': before(); state.rows.splice(ri, 1); renderAll(); save(); return;
+    case 'copyBox': before(); var r0 = state.rows[ri]; for (var k = 1; k < r0.cells.length; k++) r0.cells[k].main = clone(r0.cells[0].main); renderAll(); save(); return;
+    case 'addLine': before(); box = getPath(state, path); box.lines.push(CFT.L('', '', b.getAttribute('data-side') === '1')); renderAll(); save(); return;
+    case 'delLine': before(); getPath(state, path).lines.splice(j, 1); renderAll(); save(); return;
+    case 'lineUp': before(); move(getPath(state, path).lines, j, -1); renderAll(); save(); return;
+    case 'lineDown': before(); move(getPath(state, path).lines, j, 1); renderAll(); save(); return;
+    case 'exSvg': exSvg(); return; case 'exPdf': exPdf(); return; case 'exPng': exPng(); return;
+    case 'saveJson': saveJson(); return; case 'openJson': $('fileIn').click(); return;
+    case 'jsonFill': $('jsonbox').value = JSON.stringify({ app: 'consort-flow-builder', version: 1, settings: state.settings, rows: state.rows }, null, 2); return;
+    case 'jsonLoad': loadFromText($('jsonbox').value); return;
+  }
+}
+document.addEventListener('click', function (e) { var b = e.target.closest('button[data-act]'); if (b) act(b.getAttribute('data-act'), b); });
+document.addEventListener('change', function (e) {
+  var t = e.target, a = t.getAttribute && t.getAttribute('data-act');
+  if (a === 'ncells') {
+    before(); var ri = +t.getAttribute('data-ri'), r = state.rows[ri], k = +t.value;
+    while (r.cells.length < k) { var c = clone(r.cells[r.cells.length - 1]); c.side = { enabled: false, heading: 'Excluded', n: '', lines: [], checkSum: true }; r.cells.push(c); }
+    r.cells.length = k; renderAll(); save();
+  } else if (a === 'wpreset') {
+    if (t.value !== 'custom') { before(); state.settings.widthMm = +t.value; syncSettings(); commit(); }
+  } else if (a === 'sidetoggle') { renderEditor(); }
+  else if (t.id === 'zoom') { zoom = t.value; if (lastOut) applyZoom(lastOut); }
+  else if (t.id === 'fileIn' && t.files && t.files[0]) { var fr = new FileReader(); fr.onload = function () { loadFromText(String(fr.result)); }; fr.readAsText(t.files[0]); t.value = ''; }
+});
+document.addEventListener('input', function (e) {
+  var t = e.target, p = t.getAttribute && t.getAttribute('data-p'); if (!p) return;
+  var v = t.type === 'checkbox' ? t.checked : (t.type === 'number' ? (t.value === '' ? '' : parseFloat(t.value)) : t.value);
+  if (p === 'settings.dpi' || p === 'settings.thousands') { before(); }
+  setPath(state, p, v); if (p !== 'settings.dpi') noteEdit();
+  if (p === 'settings.widthMm') { var w = +v, sel = $('wpreset'); if (sel) sel.value = WIDTHS.some(function (x) { return x[0] === w; }) ? String(w) : 'custom'; var wi = $('widthIn'); if (wi) wi.textContent = '= ' + (w / 25.4).toFixed(2) + ' in'; }
+  commit();
+});
+document.addEventListener('keydown', function (e) {
+  var tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+});
+window.addEventListener('error', function (e) { status('Something went wrong: ' + (e.message || 'unknown error'), true); });
+
+buildSettings(); renderTemplates(); renderAll(); getDownloads();
+window.__consortDebug = { get state() { return state; }, CF: CF };
+})();
+</script>
+</body>
+</html>
